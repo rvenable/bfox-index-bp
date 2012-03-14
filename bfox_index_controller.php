@@ -1,6 +1,6 @@
 <?php
 
-class BfoxIndexController extends BfoxPluginController {
+class BfoxIndexController extends BfoxRootPluginController {
 
 	var $blogDir;
 
