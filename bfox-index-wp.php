@@ -1,8 +1,8 @@
 <?php
 /*************************************************************************
-Plugin Name: Biblefox for WordPress
-Plugin URI: http://dev.biblefox.com/biblefox-for-wordpress/
-Description: Turns your WordPress site into an online Bible study tool. Creates a Bible index for your WordPress site, allowing your users to easily search your blog posts (or BuddyPress activities, when using BuddyPress) for any Bible reference. Use it for WordPress sites that involve a lot of discussion of the Bible.
+Plugin Name: Biblefox Index
+Plugin URI: https://github.com/rvenable/bfox-index-wp
+Description: Creates a Bible index for your WordPress site, allowing your users to easily search your blog posts (or BuddyPress activities, when using BuddyPress) for any Bible reference.
 Version: 1.0 beta
 Author: Biblefox.com, rvenable
 Author URI: http://biblefox.com
@@ -33,98 +33,11 @@ Text Domain: bfox
 
 *************************************************************************/
 
-define('BFOX_VERSION', '1.0');
-define('BFOX_DIR', dirname(__FILE__));
-define('BFOX_REF_DIR', BFOX_DIR . '/external/biblefox-ref');
-define('BFOX_API_DIR', BFOX_DIR . '/api');
-define('BFOX_URL', WP_PLUGIN_URL . '/biblefox-for-wordpress');
-define('BFOX_PLANS_URL', BFOX_URL . '/reading-plans');
 
-require_once BFOX_REF_DIR . '/biblefox-ref.php';
-require_once BFOX_DIR . '/bfox_ref.php';
-require_once BFOX_DIR . '/bfox_tool.php';
-require_once BFOX_DIR . '/bfox_plan.php';
-
-
-require_once BFOX_API_DIR . '/bfox_ref-functions.php';
-require_once BFOX_API_DIR . '/bfox_ref-template.php';
-require_once BFOX_API_DIR . '/bfox_tool-functions.php';
-require_once BFOX_API_DIR . '/bfox_tool-template.php';
-require_once BFOX_API_DIR . '/bfox_plan-template.php';
-
-require_once BFOX_DIR . '/biblefox-blog/biblefox-blog.php';
-
-// TODO: these need to be moved into API
-require_once BFOX_DIR . '/translations.php';
-
-function bfox_init() {
-	wp_enqueue_style('bfox-style', BFOX_URL . '/theme/style.css', array(), BFOX_VERSION);
-	wp_enqueue_style('bfox-plan-style', BFOX_URL . '/theme/style-bfox_plan.css', array(), BFOX_VERSION);
+function bfox_index_load($core) {
+	require_once dirname(__FILE__) . '/bfox_index_controller.php';
+	$core->index = new BfoxIndexController($core, 'bfox-index-wp', 'bfox_index', '1.0', 1);
 }
-add_action('init', 'bfox_init');
-
-/**
- * Checks to see if we are requesting tooltip content (ie. by an AJAX call), returns the content, and exits
- */
-function bfox_check_for_tooltip() {
-	if (isset($_REQUEST['bfox-tooltip-ref'])) {
-		set_bfox_ref(new BfoxRef(str_replace('_', ' ', $_REQUEST['bfox-tooltip-ref'])));
-
-		// Make sure that the we have a query on bfox_tool
-		// TODO: We can get rid of this if we make sure that the tooltip URL is already loading the right query
-		// ie. if the tooltip URL loads the bfox_tool archive query (/bible-tools/?tooltip_ref=Gen+1).
-		query_posts(array('post_type' => 'bfox_tool'));
-
-		load_bfox_template('bfox-tooltip');
-		exit;
-	}
-}
-add_action('init', 'bfox_check_for_tooltip', 1000);
-
-/*
- AJAX function for sending the bible text
- */
-function bfox_ajax_send_bible_text() {
-	sleep(1);
-
-	set_bfox_ref(new BfoxRef($_POST['ref_str']));
-
-	ob_start();
-
-	load_bfox_template('admin-bfox_tool');
-
-	$content = ob_get_clean();
-	$content = addslashes(str_replace("\n", '', $content));
-
-	$script = "bfox_quick_view_loaded('$ref_str', '$content');";
-	die($script);
-}
-add_action('wp_ajax_bfox_ajax_send_bible_text', 'bfox_ajax_send_bible_text');
-
-/**
- * Returns a path for a Biblefox theme template file, first trying to load from the theme, then from the plugin
- */
-function bfox_template_path($template) {
-	$template .= '.php';
-	$path = locate_template(array($template));
-	if (empty($path)) $path = BFOX_DIR . '/theme/' . $template;
-	return apply_filters('bfox_template_path', $path, $template);
-}
-
-/**
- * Loads a Biblefox theme template file, first trying to load from the theme, then from the plugin
- */
-function load_bfox_template($template) {
-	$path = bfox_template_path($template);
-	load_template($path);
-}
-
-/**
- * Loads the BuddyPress related features
- */
-function bfox_bp_init() {
-	require_once BFOX_DIR . '/biblefox-bp/biblefox-bp.php';
-}
-add_action('bp_init', 'bfox_bp_init');
+add_action('bfox_load', 'bfox_index_load', 10, 1);
 
 ?>
