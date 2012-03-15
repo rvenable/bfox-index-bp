@@ -36,13 +36,6 @@ function bfox_blog_ref_write_link($ref_str, $text = '', $home_url = '') {
 	return "<a href='" . bfox_blog_ref_write_url($ref_str, $home_url) . "'>$text</a>";
 }
 
-function bfox_blog_ref_edit_posts_link($ref_str, $text = '') {
-	if (empty($text)) $text = $ref_str;
-	$href = get_option('home') . '/wp-admin/edit.php?tag=' . urlencode($ref_str);
-
-	return "<a href='$href'>$text</a>";
-}
-
 /**
  * Filters tags for bible references and changes their slugs to be bible reference friendly
  *

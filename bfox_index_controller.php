@@ -4,6 +4,16 @@ class BfoxIndexController extends BfoxRootPluginController {
 
 	var $blogDir;
 
+	/**
+	 * @var BfoxIndexQueryController
+	 */
+	var $query;
+
+	/**
+	 * @var BfoxIndexAdminController
+	 */
+	var $admin;
+
 	function init() {
 		parent::init();
 
@@ -11,62 +21,255 @@ class BfoxIndexController extends BfoxRootPluginController {
 
 		require_once $this->blogDir . '/biblefox-blog.php';
 		require_once $this->blogDir . '/posts.php';
+
+		// Create the controller for managing the WP Query additions
+		require_once $this->dir . '/bfox_index_query_controller.php';
+		$this->query = new BfoxIndexQueryController();
+		$this->query->index = $this;
 	}
 
-	function wpInit() {
-		bfox_add_taxonomy_ref_support('post_tag');
-		bfox_add_post_type_ref_support('post', array('post_content', 'post_tag'));
+	public function wpInit() {
+		$this->indexTaxonomyForAllIndexedPostTypes('post_tag');
+		$this->indexPostTypeUsingTaxonomies('post', array('post_content', 'post_tag'));
 		bfox_add_ref_links_to_taxonomy('post_tag');
-		bfox_add_ref_admin_column('post', 'author');
 	}
 
-	function wpAdminMenu() {
-		// Add the quick view meta box
-		bfox_add_quick_view_meta_box('post');
+	function wpAdminInit() {
+		require_once $this->dir . '/bfox_index_admin_controller.php';
+		$this->admin = new BfoxIndexAdminController();
+		$this->admin->index = $this;
 
-		if (is_multisite() || !get_site_option('bfox-ms-allow-blog-options'))
-			return;
+		$this->admin->addRefMetaBoxForPostType('post');
+		$this->admin->addRefAdminColumn('post', 'author');
 
-		require_once $this->blogDir . '/admin.php';
-
-		add_options_page(
-			__('Bible Settings', 'bfox'), // Page title
-			__('Bible Settings', 'bfox'), // Menu title
-			'manage_options', // Capability
-			'bfox-blog-settings', // Menu slug
-			'bfox_blog_admin_page' // Function
-		);
-
-		add_settings_section('bfox-admin-settings-main', 'Settings', 'bfox_bp_admin_settings_bible_directory', 'bfox-admin-settings');
-
-		add_settings_section('bfox-blog-admin-settings-main', __('Settings', 'bfox'), 'bfox_blog_admin_settings_main', 'bfox-blog-admin-settings');
-
-		add_settings_field('bfox-tooltips', __('Disable Bible Reference Tooltips', 'bfox'), 'bfox_blog_admin_setting_tooltips', 'bfox-blog-admin-settings', 'bfox-blog-admin-settings-main', array('label_for' => 'bfox-toolips'));
-		register_setting('bfox-blog-admin-settings', 'bfox-blog-options');
-
-		do_action('bfox_blog_admin_menu');
+		$this->scanPosts(200);
 	}
 
-	function wpNetworkAdminMenu() {
-		require_once $this->blogDir . '/ms-admin.php';
-		require_once $this->blogDir . '/admin.php'; // We need to load this for the blog options functions (for instance, bfox_blog_admin_setting_tooltips())
+	/**
+	 * @var BfoxPostRefDbTable
+	 */
+	private $_dbTable = null;
 
-		add_submenu_page(
-			'settings.php', // Parent slug
-			__('Biblefox', 'bfox'), // Page title
-			__('Biblefox', 'bfox'), // Menu title
-			10, // Capability
-			'bfox-ms', // Menu slug
-			'bfox_ms_admin_page' // Function
-		);
+	/**
+	 * @return BfoxPostRefDbTable
+	 */
+	function dbTable() {
+		if (is_null($this->_dbTable)) $this->resetDbTable();
+		return $this->_dbTable;
+	}
 
-		add_settings_section('bfox-ms-admin-settings-main', __('Settings', 'bfox'), 'bfox_ms_admin_settings_main', 'bfox-ms-admin-settings');
-		add_settings_field('bfox-ms-allow-blog-options', __('Allow Biblefox Blog Options', 'bfox'), 'bfox_ms_admin_setting_allow_blog_options', 'bfox-ms-admin-settings', 'bfox-ms-admin-settings-main', array('label_for' => 'bfox-ms-allow-blog-options'));
+	function resetDbTable() {
+		require_once $this->dir . '/bfox_post_ref_db_table.php';
+		$this->_dbTable = new BfoxPostRefDbTable();
+		$this->_dbTable->index = $this;
+		$this->_dbTable->check_install();
+	}
 
-		// Blog settings (found in admin.php, not ms-admin.php)
-		add_settings_field('bfox-tooltips', __('Disable Bible Reference Tooltips', 'bfox'), 'bfox_blog_admin_setting_tooltips', 'bfox-ms-admin-settings', 'bfox-ms-admin-settings-main', array('label_for' => 'bfox-tooltips'));
+	function wpSwitchBlog() {
+		if (!is_null($this->_dbTable)) {
+			$this->resetDbTable();
+		}
+	}
 
-		do_action('bfox_ms_admin_menu');
+	/**
+	* Save the bible references for a blog post
+	*
+	* @param integer $post_id
+	* @param object $post
+	*/
+	function wpSavePost($post_id, $post) {
+		// Only save the post if it supports Bible references
+		if ($this->postTypeIsIndexed($post->post_type)) {
+			$table = $this->dbTable();
+			$table->save_post($post);
+		}
+	}
+	private static $wpSavePostFilterParams = array(10, 2);
+
+	/**
+	 * Delete the bible references for a blog post
+	 *
+	 * @param integer $post_id
+	 */
+	function wpDeletePost($post_id) {
+		$table = $this->dbTable();
+		$table->delete_simple_items($post_id);
+	}
+
+	/**
+	* Adds Bible Reference support for a given taxonomy
+	*
+	* @param string $taxonomy
+	*/
+	function indexTaxonomyForAllIndexedPostTypes($taxonomy) {
+		$this->indexPostTypeUsingTaxonomies('', array($taxonomy));
+	}
+
+	/**
+	 * Adds Bible Reference support for a given post_type/taxonomy combination
+	 *
+	 * Bible reference support means that Bible references will be detected and indexed for the given post_type/taxonomy combo.
+	 * If no taxonomies specified, the default is array('post_content')
+	 *
+	 * @param string $post_type
+	 * @param array $taxonomies
+	 */
+	function indexPostTypeUsingTaxonomies($post_type = '', $taxonomies = '') {
+		if (!$post_type) $post_type = '_bfox_all_types';
+		if (!$taxonomies) $taxonomies = array('post_content');
+
+		foreach ((array) $taxonomies as $taxonomy) {
+			$this->postTypes[$post_type][$taxonomy] = true;
+		}
+	}
+
+	/**
+	 * Removes Bible Reference support for a given post_type/taxonomy combination
+	 *
+	 * If no taxonomies specified, all support for the post_type will be removed
+	 *
+	 * @param string $post_type
+	 * @param array $taxonomies
+	 */
+	function removePostTypeAndTaxonomies($post_type = '', $taxonomies = array()) {
+		if (!$post_type) $post_type = '_bfox_all_types';
+		if (empty($taxonomies)) $taxonomies = array_keys((array) $this->postTypes[$post_type]);
+		foreach ((array) $taxonomies as $taxonomy) $this->postTypes[$post_type][$taxonomy] = false;
+	}
+
+	/**
+	 * Returns whether a given post_type/taxonomy combination support bible references
+	 *
+	 * If no taxonomy given, returns whether the post_type supports refs with at least one taxonomy
+	 * If no post_type given, returns whether the taxonomy supports refs by default with any post type (ie. taxonomies that are Bible specific would do this)
+	 * If both given, returns whether the post_type/taxonomy combo supports refs
+	 * If neither given, returns false
+	 *
+	 * @param string $post_type
+	 * @param string $taxonomy
+	 * @return bool
+	 */
+	function postTypeIsIndexed($post_type = '', $taxonomy = '') {
+		if ($taxonomy) {
+			if (!$post_type) $post_type = '_bfox_all_types';
+			return $this->postTypes[$post_type][$taxonomy] || ($this->postTypes['_bfox_all_types'][$taxonomy] && false !== $this->postTypes[$post_type][$taxonomy]);
+		}
+		else {
+			return $post_type && in_array(true, (array) $this->postTypes[$post_type]);
+		}
+	}
+
+	/**
+	 * Returns an array of taxonomies that support refs
+	 *
+	 * @param $post_type
+	 * @return array
+	 */
+	function indexedTaxonomiesForPostType($post_type) {
+		$taxonomies = array();
+
+		// Add the taxonomies for this post type
+		foreach ((array) $this->postTypes[$post_type] as $taxonomy => $is_supported)
+		if ($is_supported) $taxonomies []= $taxonomy;
+
+		// Add the taxonomies that support all post types
+		foreach ((array) $this->postTypes['_bfox_all_types'] as $taxonomy => $is_supported)
+		if ($is_supported && false !== $this->postTypes[$post_type][$taxonomy]) $taxonomies []= $taxonomy;
+
+		return $taxonomies;
+	}
+
+	/**
+	 * Returns an array of post_types that support Bible references
+	 *
+	 * @return array
+	 */
+	function indexedPostTypes() {
+		$post_types = array();
+		foreach ($this->postTypes as $post_type => $taxonomies) if ('_bfox_all_types' != $post_type) {
+			if (in_array(true, $taxonomies)) $post_types []= $post_type;
+		}
+
+		return $post_types;
+	}
+
+	/**
+	 * Return the bible references for a given blog post
+	 *
+	 * @param $post
+	 * @return BfoxRef
+	 */
+	function refForTaxonomiesOfPost($post) {
+		if (!is_object($post)) $post = get_post($post);
+
+		$refs_for_taxonomies = array();
+		$taxonomies = $this->indexedTaxonomiesForPostType($post->post_type);
+		foreach ($taxonomies as $taxonomy) {
+			if ('post_content' == $taxonomy) {
+				$ref = bfox_ref_from_content($post->post_content);
+			}
+			else {
+				$ref = new BfoxRef;
+				$terms = wp_get_post_terms($post->ID, $taxonomy, array('fields' => 'names'));
+				foreach ($terms as $term) $ref->add_ref(bfox_ref_from_tag($term));
+			}
+
+			if ($ref && $ref->is_valid()) {
+				$refs_for_taxonomies[$taxonomy] = $ref;
+			}
+			unset($ref);
+		}
+
+		return $refs_for_taxonomies;
+	}
+
+	/**
+	 * Return the bible references for a given blog post
+	 *
+	 * @param $post
+	 * @param string $taxonomy
+	 * @return BfoxRef
+	 */
+	function refForPost($post, $taxonomy = '') {
+		$total_ref = new BfoxRef;
+
+		$refs_for_taxonomies = $this->refForTaxonomiesOfPost($post);
+
+		if (!empty($taxonomy)) {
+			if (isset($refs_for_taxonomies[$taxonomy])) $total_ref = $total_ref->add_ref($refs_for_taxonomies[$taxonomy]);
+		}
+		else {
+			foreach ($refs_for_taxonomies as $ref) $total_ref->add_ref($ref);
+		}
+
+		return $total_ref;
+	}
+
+	/**
+	 * Scans a given number of blog posts for Bible references
+	 *
+	 * @param unknown_type $limit
+	 */
+	private function scanPosts($limit) {
+		$indexedPostTypes = $this->option('indexedPostTypes');
+		if ($indexedPostTypes != $this->postTypes) {
+			// If the configuration has changed, reset the indexes
+			$this->setOption('indexStatus', array());
+			$this->setOption('indexedPostTypes', $this->postTypes);
+		}
+
+		$status = $this->option('indexStatus');
+		if (!isset($status['scanned'])) {
+			$status = array('scanned' => 0, 'indexed' => 0, 'total' => 0);
+		}
+
+		if ($status['scanned'] < $status['total']) {
+			extract(BfoxRefDbTable::simple_refresh($table, 'ID', '', $limit, $status['scanned']));
+			$status['scanned'] += $scanned;
+			$status['indexed'] += $indexed;
+			$status['total'] = $total;
+			$this->setOption('indexStatus', $status);
+		}
 	}
 }
 
