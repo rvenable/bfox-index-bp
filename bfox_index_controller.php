@@ -77,14 +77,13 @@ class BfoxIndexController extends BfoxRootPluginController {
 	* @param integer $post_id
 	* @param object $post
 	*/
-	function wpSavePost($post_id, $post) {
+	function wp2SavePost($post_id, $post) {
 		// Only save the post if it supports Bible references
 		if ($this->postTypeIsIndexed($post->post_type)) {
 			$table = $this->dbTable();
 			$table->save_post($post);
 		}
 	}
-	private static $wpSavePostFilterParams = array(10, 2);
 
 	/**
 	 * Delete the bible references for a blog post
