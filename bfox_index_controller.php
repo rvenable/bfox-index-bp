@@ -205,12 +205,12 @@ class BfoxIndexController extends BfoxRootPluginController {
 		$taxonomies = $this->indexedTaxonomiesForPostType($post->post_type);
 		foreach ($taxonomies as $taxonomy) {
 			if ('post_content' == $taxonomy) {
-				$ref = bfox_ref_from_content($post->post_content);
+				$ref = $this->core->refFromPostContent($post->post_content);
 			}
 			else {
 				$ref = new BfoxRef;
 				$terms = wp_get_post_terms($post->ID, $taxonomy, array('fields' => 'names'));
-				foreach ($terms as $term) $ref->add_ref(bfox_ref_from_tag($term));
+				foreach ($terms as $term) $ref->add_ref($this->core->refFromTag($term));
 			}
 
 			if ($ref && $ref->is_valid()) {
