@@ -1,40 +1,5 @@
 <?php
 
-/**
- * Returns a url for the search page using a Bible Reference as the search filter
- *
- * Should be used whenever we want to link to the Bible search archive, as opposed to the Bible reader
- *
- * @param string $ref_str
- * @return string
- */
-function bfox_ref_blog_url($ref_str) {
-	$ref_str = urlencode(strtolower($ref_str));
-
-	// NOTE: This function imitates the WP get_tag_link() function, but instead of getting a tag slug, we use $ref_str
-	global $wp_rewrite;
-	$taglink = $wp_rewrite->get_search_permastruct();
-
-	if (empty($taglink)) $taglink = get_option('home') . '/?s=' . $ref_str;
-	else {
-		$taglink = str_replace('%search%', $ref_str, $taglink);
-		$taglink = get_option('home') . '/' . user_trailingslashit($taglink, 'category');
-	}
-
-	return $taglink;
-}
-
-function bfox_blog_ref_write_url($ref_str, $home_url = '') {
-	if (empty($home_url)) $home_url = get_option('home');
-
-	return rtrim($home_url, '/') . '/wp-admin/post-new.php?bfox_ref=' . urlencode($ref_str);
-}
-
-function bfox_blog_ref_write_link($ref_str, $text = '', $home_url = '') {
-	if (empty($text)) $text = $ref_str;
-
-	return "<a href='" . bfox_blog_ref_write_url($ref_str, $home_url) . "'>$text</a>";
-}
 
 /**
  * Filters tags for bible references and changes their slugs to be bible reference friendly

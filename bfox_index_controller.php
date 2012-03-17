@@ -14,24 +14,31 @@ class BfoxIndexController extends BfoxRootPluginController {
 	 */
 	var $admin;
 
+	/**
+	 * @var BfoxPostSearchRefLinker
+	 */
+	var $searchLinker;
+
 	function init() {
 		parent::init();
 
 		$this->blogDir = $this->dir . '/biblefox-blog';
 
+		require_once $this->dir . '/bfox_post_search_ref_linker.php';
+		require_once $this->dir . '/bfox_new_post_ref_linker.php';
 		require_once $this->blogDir . '/biblefox-blog.php';
-		require_once $this->blogDir . '/posts.php';
 
 		// Create the controller for managing the WP Query additions
 		require_once $this->dir . '/bfox_index_query_controller.php';
 		$this->query = new BfoxIndexQueryController();
 		$this->query->index = $this;
+		$this->searchLinker = new BfoxPostSearchRefLinker();
 	}
 
 	public function wpInit() {
 		$this->indexTaxonomyForAllIndexedPostTypes('post_tag');
+		$this->useRefLinksForTaxonomy('post_tag');
 		$this->indexPostTypeUsingTaxonomies('post', array('post_content', 'post_tag'));
-		bfox_add_ref_links_to_taxonomy('post_tag');
 	}
 
 	function wpAdminInit() {
@@ -93,6 +100,43 @@ class BfoxIndexController extends BfoxRootPluginController {
 	function wpDeletePost($post_id) {
 		$table = $this->dbTable();
 		$table->delete_simple_items($post_id);
+	}
+
+	function filterPostContent($content, $taxonomy = 'post_content') {
+		global $post;
+		if ($this->postTypeIsIndexed($post->post_type, $taxonomy)) {
+			$content = $this->core->replaceRefsInHTML($content);
+		}
+		return $content;
+	}
+
+	function useRefLinksForTaxonomy($taxonomy) {
+		$this->addFilter("term_links-$taxonomy", 'replaceRefsInTagLinks');
+	}
+
+	function replaceRefsInTagLinks($tagLinks) {
+		return $this->core->replaceRefsInTagLinks($tagLinks, $this->searchLinker->refReplaceCallback());
+	}
+
+	function wpTheContent($content) {
+		return $this->filterPostContent($content);
+	}
+
+	function wpTheExcerpt($content) {
+		return $this->filterPostContent($content);
+	}
+
+	function wpCommentText($content) {
+		return $this->filterPostContent($content);
+	}
+
+	/**
+	 * Default function for returning a URL for a ref string
+	 *
+	 * @param string $refStr
+	 */
+	function urlForRefStr($refStr) {
+		return $this->searchLinker->urlForRefStr($refStr);
 	}
 
 	/**
