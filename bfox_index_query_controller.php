@@ -22,7 +22,7 @@ class BfoxIndexQueryController extends BfoxPluginController {
 		if (!empty($wp_query->query_vars['tag']) &&
 			isset($wp_query->query_vars['post_type']) &&
 			$this->index->postTypeIsIndexed($wp_query->query_vars['post_type'], 'post_tag')) {
-			$ref = $this->index->core->refFromTag($wp_query->query_vars['tag']);
+			$ref = $this->index->core->refs->refFromTag($wp_query->query_vars['tag']);
 			if ($ref->is_valid()) {
 				wp_redirect($this->index->urlForRefStr($wp_query->query_vars['tag']));
 				die();
@@ -32,7 +32,7 @@ class BfoxIndexQueryController extends BfoxPluginController {
 		// Check to see if the search string is a bible reference
 		if (!empty($wp_query->query_vars['s'])) {
 			// TODO: use leftovers
-			$ref = $this->index->core->refFromTag(urldecode($wp_query->query_vars['s']));
+			$ref = $this->index->core->refs->refFromTag(urldecode($wp_query->query_vars['s']));
 			if ($ref->is_valid()) {
 				// Store the ref in the WP_Query
 				$wp_query->bfox_ref = $ref;

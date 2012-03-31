@@ -105,7 +105,7 @@ class BfoxIndexController extends BfoxRootPluginController {
 	function filterPostContent($content, $taxonomy = 'post_content') {
 		global $post;
 		if ($this->postTypeIsIndexed($post->post_type, $taxonomy)) {
-			$content = $this->core->replaceRefsInHTML($content);
+			$content = $this->core->refs->replaceInHTML($content);
 		}
 		return $content;
 	}
@@ -115,7 +115,7 @@ class BfoxIndexController extends BfoxRootPluginController {
 	}
 
 	function replaceRefsInTagLinks($tagLinks) {
-		return $this->core->replaceRefsInTagLinks($tagLinks, $this->searchLinker->refReplaceCallback());
+		return $this->core->refs->replaceInTagLinks($tagLinks, $this->searchLinker->replaceCallback());
 	}
 
 	function wpTheContent($content) {
@@ -249,12 +249,12 @@ class BfoxIndexController extends BfoxRootPluginController {
 		$taxonomies = $this->indexedTaxonomiesForPostType($post->post_type);
 		foreach ($taxonomies as $taxonomy) {
 			if ('post_content' == $taxonomy) {
-				$ref = $this->core->refFromPostContent($post->post_content);
+				$ref = $this->core->refs->refFromPostContent($post->post_content);
 			}
 			else {
 				$ref = new BfoxRef;
 				$terms = wp_get_post_terms($post->ID, $taxonomy, array('fields' => 'names'));
-				foreach ($terms as $term) $ref->add_ref($this->core->refFromTag($term));
+				foreach ($terms as $term) $ref->add_ref($this->core->refs->refFromTag($term));
 			}
 
 			if ($ref && $ref->is_valid()) {
@@ -294,14 +294,14 @@ class BfoxIndexController extends BfoxRootPluginController {
 	 * @param unknown_type $limit
 	 */
 	private function scanPosts($limit) {
-		$indexedPostTypes = $this->option('indexedPostTypes');
+		$indexedPostTypes = $this->options->value('indexedPostTypes');
 		if ($indexedPostTypes != $this->postTypes) {
 			// If the configuration has changed, reset the indexes
-			$this->setOption('indexStatus', array());
-			$this->setOption('indexedPostTypes', $this->postTypes);
+			$this->options->setValue('indexStatus', array());
+			$this->options->setValue('indexedPostTypes', $this->postTypes);
 		}
 
-		$status = $this->option('indexStatus');
+		$status = $this->options->value('indexStatus');
 		if (!isset($status['scanned'])) {
 			$status = array('scanned' => 0, 'indexed' => 0, 'total' => 0);
 		}
@@ -311,7 +311,7 @@ class BfoxIndexController extends BfoxRootPluginController {
 			$status['scanned'] += $scanned;
 			$status['indexed'] += $indexed;
 			$status['total'] = $total;
-			$this->setOption('indexStatus', $status);
+			$this->options->setValue('indexStatus', $status);
 		}
 	}
 }
