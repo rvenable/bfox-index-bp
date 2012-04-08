@@ -148,6 +148,8 @@ class BfoxIndexController extends BfoxRootPluginController {
 		$this->indexPostTypeUsingTaxonomies('', array($taxonomy));
 	}
 
+	private $postTypes = array('_bfox_all_types' => array());
+
 	/**
 	 * Adds Bible Reference support for a given post_type/taxonomy combination
 	 *
@@ -198,7 +200,7 @@ class BfoxIndexController extends BfoxRootPluginController {
 			return $this->postTypes[$post_type][$taxonomy] || ($this->postTypes['_bfox_all_types'][$taxonomy] && false !== $this->postTypes[$post_type][$taxonomy]);
 		}
 		else {
-			return $post_type && in_array(true, (array) $this->postTypes[$post_type]);
+			return $post_type && isset($this->postTypes[$post_type]) && in_array(true, (array) $this->postTypes[$post_type]);
 		}
 	}
 
@@ -212,12 +214,20 @@ class BfoxIndexController extends BfoxRootPluginController {
 		$taxonomies = array();
 
 		// Add the taxonomies for this post type
-		foreach ((array) $this->postTypes[$post_type] as $taxonomy => $is_supported)
-		if ($is_supported) $taxonomies []= $taxonomy;
+		if (isset($this->postTypes[$post_type])) {
+			foreach ((array) $this->postTypes[$post_type] as $taxonomy => $is_supported) {
+				if ($is_supported) {
+					$taxonomies []= $taxonomy;
+				}
+			}
+		}
 
 		// Add the taxonomies that support all post types
-		foreach ((array) $this->postTypes['_bfox_all_types'] as $taxonomy => $is_supported)
-		if ($is_supported && false !== $this->postTypes[$post_type][$taxonomy]) $taxonomies []= $taxonomy;
+		foreach ((array) $this->postTypes['_bfox_all_types'] as $taxonomy => $is_supported) {
+			if ($is_supported && (!isset($this->postTypes[$post_type][$taxonomy]) || false !== $this->postTypes[$post_type][$taxonomy])) {
+				$taxonomies []= $taxonomy;
+			}
+		}
 
 		return $taxonomies;
 	}
@@ -242,10 +252,15 @@ class BfoxIndexController extends BfoxRootPluginController {
 	 * @param $post
 	 * @return BfoxRef
 	 */
-	function refForTaxonomiesOfPost($post) {
+	function refsForTaxonomiesOfPost($post) {
 		if (!is_object($post)) $post = get_post($post);
 
 		$refs_for_taxonomies = array();
+
+		if (!$post) {
+			return $refs_for_taxonomies;
+		}
+
 		$taxonomies = $this->indexedTaxonomiesForPostType($post->post_type);
 		foreach ($taxonomies as $taxonomy) {
 			if ('post_content' == $taxonomy) {
@@ -276,7 +291,7 @@ class BfoxIndexController extends BfoxRootPluginController {
 	function refForPost($post, $taxonomy = '') {
 		$total_ref = new BfoxRef;
 
-		$refs_for_taxonomies = $this->refForTaxonomiesOfPost($post);
+		$refs_for_taxonomies = $this->refsForTaxonomiesOfPost($post);
 
 		if (!empty($taxonomy)) {
 			if (isset($refs_for_taxonomies[$taxonomy])) $total_ref = $total_ref->add_ref($refs_for_taxonomies[$taxonomy]);

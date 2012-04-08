@@ -49,7 +49,7 @@ class BfoxPostRefDbTable extends BfoxRefDbTable {
 
 		$saved = false;
 		if (!empty($post_id)) {
-			$refs_for_taxonomies = $this->index->refForTaxonomiesOfPost($post);
+			$refs_for_taxonomies = $this->index->refsForTaxonomiesOfPost($post);
 			foreach ($refs_for_taxonomies as $taxonomy => $ref) {
 				$saved = $this->save_item(array('item_id' => $post->ID, 'taxonomy' => $taxonomy), $ref) || $saved;
 			}
