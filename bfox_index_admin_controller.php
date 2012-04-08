@@ -111,7 +111,7 @@ class BfoxIndexAdminController extends BfoxPluginController {
 	 * @param object $post
 	 */
 	function wp3DoMetaBoxes($page, $context, $post) {
-		if (!empty($post) && (!$post->ID || 'auto-draft' == $post->post_status) && 'post' == $page && 'side' == $context && !empty($_REQUEST['bfox_ref'])) {
+		if (!empty($_REQUEST['bfox_ref']) && !empty($post) && (!$post->ID || 'auto-draft' == $post->post_status) && 'post' == $page && 'side' == $context) {
 			$hidden_ref = new BfoxRef($_REQUEST['bfox_ref']);
 			if ($hidden_ref->is_valid()) {
 				global $wp_meta_boxes;
