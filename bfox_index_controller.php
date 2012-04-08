@@ -46,7 +46,6 @@ class BfoxIndexController extends BfoxRootPluginController {
 		$this->admin = new BfoxIndexAdminController();
 		$this->admin->index = $this;
 
-		$this->admin->addRefMetaBoxForPostType('post');
 		$this->admin->addRefAdminColumn('post', 'author');
 
 		$this->scanPosts(200);

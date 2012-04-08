@@ -7,25 +7,6 @@ class BfoxIndexAdminController extends BfoxPluginController {
 	 */
 	var $index;
 
-	/**
-	 * Add a Bible quick view meta box
-	 *
-	 * @param $page
-	 * @param $context
-	 * @param $priority
-	 */
-	function addRefMetaBoxForPostType($page, $context = 'normal', $priority = 'core') {
-		add_meta_box('bible-quick-view-div', __('Bible References', 'bfox'), $this->functionWithName('loadPostRefMetaBox'), $page, $context, $priority);
-	}
-
-	/**
-	 * Creates the form displaying the scripture quick view
-	 *
-	 */
-	function loadPostRefMetaBox() {
-		$this->loadTemplate('edit_post-bfox_index');
-	}
-
 	private $postTypeRefColumnPositions = array();
 
 	/**
